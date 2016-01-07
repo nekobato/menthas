@@ -290,7 +290,9 @@ module.exports = React.createClass({
     }
   },
   render: function() {
-    return React.createElement("div", null, React.createElement("div", {
+    return React.createElement("div", {
+      "className": "app-wrapper"
+    }, React.createElement("div", {
       "id": "sidebar-wrapper"
     }, React.createElement(Sidebar, {
       "currentCategory": this.state.category,
@@ -414,7 +416,7 @@ module.exports = React.createClass({
 
 },{"fluxxor":12,"react":342}],9:[function(require,module,exports){
 /*!
-  Copyright (c) 2015 Jed Watson.
+  Copyright (c) 2016 Jed Watson.
   Licensed under the MIT License (MIT), see
   http://jedwatson.github.io/classnames
 */
@@ -426,7 +428,7 @@ module.exports = React.createClass({
 	var hasOwn = {}.hasOwnProperty;
 
 	function classNames () {
-		var classes = '';
+		var classes = [];
 
 		for (var i = 0; i < arguments.length; i++) {
 			var arg = arguments[i];
@@ -435,19 +437,19 @@ module.exports = React.createClass({
 			var argType = typeof arg;
 
 			if (argType === 'string' || argType === 'number') {
-				classes += ' ' + arg;
+				classes.push(arg);
 			} else if (Array.isArray(arg)) {
-				classes += ' ' + classNames.apply(null, arg);
+				classes.push(classNames.apply(null, arg));
 			} else if (argType === 'object') {
 				for (var key in arg) {
 					if (hasOwn.call(arg, key) && arg[key]) {
-						classes += ' ' + key;
+						classes.push(key);
 					}
 				}
 			}
 		}
 
-		return classes.substr(1);
+		return classes.join(' ');
 	}
 
 	if (typeof module !== 'undefined' && module.exports) {
@@ -33615,6 +33617,18 @@ function parseHeader(str) {
 }
 
 /**
+ * Check if `mime` is json or has +json structured syntax suffix.
+ *
+ * @param {String} mime
+ * @return {Boolean}
+ * @api private
+ */
+
+function isJSON(mime) {
+  return /[\/+]json\b/.test(mime);
+}
+
+/**
  * Return the mime type for the given `str`.
  *
  * @param {String} str
@@ -33869,6 +33883,8 @@ function Request(method, url) {
       err = new Error('Parser is unable to parse the response');
       err.parse = true;
       err.original = e;
+      // issue #675: return the raw response if the response parsing fails
+      err.rawResponse = self.xhr && self.xhr.responseText ? self.xhr.responseText : null;
       return self.callback(err);
     }
 
@@ -34259,8 +34275,13 @@ Request.prototype.callback = function(err, res){
  */
 
 Request.prototype.crossDomainError = function(){
-  var err = new Error('Origin is not allowed by Access-Control-Allow-Origin');
+  var err = new Error('Request has been terminated\nPossible causes: the network is offline, Origin is not allowed by Access-Control-Allow-Origin, the page is being unloaded, etc.');
   err.crossDomain = true;
+
+  err.status = this.status;
+  err.method = this.method;
+  err.url = this.url;
+
   this.callback(err);
 };
 
@@ -34376,6 +34397,7 @@ Request.prototype.end = function(fn){
     // serialize stuff
     var contentType = this.getHeader('Content-Type');
     var serialize = this._parser || request.serialize[contentType ? contentType.split(';')[0] : ''];
+    if (!serialize && isJSON(contentType)) serialize = request.serialize['application/json'];
     if (serialize) data = serialize(data);
   }
 
